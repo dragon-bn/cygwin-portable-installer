@@ -119,7 +119,7 @@ Write-Host -Object "Programme d'installation CYGMIN : $CYGWIN_SETUP";
 
 $DownloadFileSetup=Join-Path $INSTALL_ROOT -ChildPath $CYGWIN_SETUP;
 Write-Host -Object "Chemin de l'installateur CYGWIN : $DownloadFileSetup";
-if(!(Test-Path -Path $DownloadFileSetup -PathType Leaf))
+if (!(Test-Path -Path $DownloadFileSetup -PathType Leaf))
    {
       Write-Host -Object "Suppression de l'installateur CYGWIN : $DownloadFileSetup";
       Remove-Item -Parent $DownloadFileSetup;
@@ -226,7 +226,7 @@ The default is to both download and install packages, unless either --download o
 #>
 
 $CYGWIN_CACHE=$(Join-Path $CYGWIN_ROOT -ChildPath ".pkg-cache");
-if(!(Test-Path -Path $CYGWIN_CACHE -PathType Container))
+if (!(Test-Path -Path $CYGWIN_CACHE -PathType Container))
    {
       New-Item -Type Directory -Path $CYGWIN_CACHE -Force;
    }
@@ -310,68 +310,65 @@ $Init_sh= Join-Path -Path "$CYGWIN_ROOT" -ChildPath "portable-init.sh";
 Write-Host -Object "Creating [$Init_sh]...";
 
 $Init_sh_template = @"
-    echo #!/usr/bin/env bash
-    echo.
-    echo #
-    echo # Map Current Windows User to root user
-    echo #
-    echo.
-    echo # Check if current Windows user is in /etc/passwd
-    echo USER_SID="`$(mkpasswd -c | cut -d':' -f 5)"
-    echo if ! grep -F "`$USER_SID" /etc/passwd > /dev/null; then
-    echo     echo "Mapping Windows user '$USER_SID' to cygwin '$USERNAME' in /etc/passwd..."
-    echo     GID="`$(mkpasswd -c | cut -d':' -f 4)"
-    echo     echo `$USERNAME:unused:1001:`$GID`:`$USER_SID:`$HOME:/bin/bash > /etc/passwd
-    echo fi
-    echo.
-    echo # already set in cygwin-portable.cmd:
-    echo # export CYGWIN_ROOT=`$(cygpath -w /^)
-    echo.
-    echo #
-    echo # adjust Cygwin packages cache path
-    echo #
-    echo pkg_cache_dir=$(cygpath -w "`$CYGWIN_ROOT/.pkg-cache"^)
-    echo sed -i -E "s/.*\\\.pkg-cache/"`$'\t'"`${pkg_cache_dir//\\/\\\\}/" /etc/setup/setup.rc
-    echo.
-    if not "`$PROXY_HOST" == "" (
-        echo if [[ `$HOSTNAME == "%COMPUTERNAME%" ]]; then
-        echo     export http_proxy=http://`$PROXY_HOST:`$PROXY_PORT
-        echo     export https_proxy=`$http_proxy
-        echo fi
-    )
-    if "%INSTALL_CONEMU%" == "yes" (
-        echo #
-        echo # Installing conemu if required
-        echo #
-        echo conemu_dir=`$(cygpath -w "$CYGWIN_ROOT/../conemu"^)
-        echo if [[ ! -e `$conemu_dir ]]; then
-        echo     echo "*******************************************************************************"
-        echo     echo "* Installing ConEmu..."
-        echo     echo "*******************************************************************************"
-        echo     conemu_url="https://github.com$(wget https://github.com/Maximus5/ConEmu/releases/latest -O - 2>/dev/null | egrep '/.*/releases/download/.*/.*7z' -o)" ^&^& \
-        echo     echo "Download URL=`$conemu_url" ^&^& \
-        echo     wget -O "`${conemu_dir}.7z" `$conemu_url ^&^& \
-        echo     mkdir "`$conemu_dir" ^&^& \
-        echo     bsdtar -xvf "`${conemu_dir}.7z" -C "`$conemu_dir" ^&^& \
-        echo     rm "`${conemu_dir}.7z"
-        echo fi
-    )
+#!/usr/bin/env bash
+#
+# Map Current Windows User to root user
+#
+# Check if current Windows user is in /etc/passwd
+USER_SID="`$(mkpasswd -c | cut -d':' -f 5)"
+if ! grep -F "`$USER_SID" /etc/passwd > /dev/null; then
+   echo "Mapping Windows user '`$USER_SID' to cygwin '`$USERNAME' in /etc/passwd..."
+   GID="`$(mkpasswd -c | cut -d':' -f 4)"
+   echo `$USERNAME:unused:1001:`$GID`:`$USER_SID:`$HOME:/bin/bash > /etc/passwd
+fi
+
+# already set in cygwin-portable.cmd:
+# export CYGWIN_ROOT=`$(cygpath -w /^)
+
+# adjust Cygwin packages cache path
+#
+pkg_cache_dir=`$(cygpath -w "`$CYGWIN_ROOT/.pkg-cache"^)
+sed -i -E "s/.*\\\.pkg-cache/"`$'\t'"`${pkg_cache_dir//\\/\\\\}/" /etc/setup/setup.rc
+
+if not "`$PROXY_HOST" == "" (
+   if [[ `$HOSTNAME == "%COMPUTERNAME%" ]]; then
+      export http_proxy=http://`$PROXY_HOST:`$PROXY_PORT
+      export https_proxy=`$http_proxy
+   fi
+   )
+if "%INSTALL_CONEMU%" == "yes" (
+   #
+   # Installing conemu if required
+   #
+   conemu_dir=`$(cygpath -w "`$CYGWIN_ROOT/../conemu"^)
+   if [[ ! -e `$conemu_dir ]]; then
+      echo "*******************************************************************************"
+      echo "* Installing ConEmu..."
+      echo "*******************************************************************************"
+      conemu_url="https://github.com`$(wget https://github.com/Maximus5/ConEmu/releases/latest -O - 2>/dev/null | egrep '/.*/releases/download/.*/.*7z' -o)" ^&^& \
+      echo "Download URL=`$conemu_url" ^& \
+      wget -O "`${conemu_dir}.7z" `$conemu_url ^&^& \
+      mkdir "`$conemu_dir" ^&^& \
+      bsdtar -xvf "`${conemu_dir}.7z" -C "`$conemu_dir" ^&^& \
+      rm "`${conemu_dir}.7z"
+   fi
+   )
     if "%INSTALL_ANSIBLE%" == "yes" (
-        echo.
-        echo #
-        echo # Installing Ansible if not yet installed
-        echo #
-        echo if [[ ! -e /opt ]]; then mkdir /opt; fi
-        echo export PYTHONHOME=/usr/ PYTHONPATH=/usr/lib/python2.7 # workaround for "ImportError: No module named site" when Python for Windows is installed too
-        echo export PATH=`$PATH:/opt/ansible/bin
-        echo export PYTHONPATH=`$PYTHONPATH:/opt/ansible/lib
-        echo if ! hash ansible 2^>/dev/null; then
-        echo     echo "*******************************************************************************"
-        echo     echo "* Installing [Ansible - %ANSIBLE_GIT_BRANCH%]..."
-        echo     echo "*******************************************************************************"
-        echo     git clone https://github.com/ansible/ansible --branch %ANSIBLE_GIT_BRANCH% --single-branch --depth 1 --shallow-submodules /opt/ansible
-        echo fi
-        echo.
+        
+        #
+        # Installing Ansible if not yet installed
+        #
+        if [[ ! -e /opt ]]; then mkdir /opt; fi
+        export PYTHONHOME=/usr/ PYTHONPATH=/usr/lib/python2.7 # workaround for "ImportError: No module named site" when Python for Windows is installed too
+        export PATH=`$PATH:/opt/ansible/bin
+        export PYTHONPATH=`$PYTHONPATH:/opt/ansible/lib
+        if ! hash ansible 2^>/dev/null; then
+         echo "*******************************************************************************"
+         echo "* Installing [Ansible - %ANSIBLE_GIT_BRANCH%]..."
+         echo "*******************************************************************************"
+         git clone https://github.com/ansible/ansible --branch %ANSIBLE_GIT_BRANCH% --single-branch --depth 1 --shallow-submodules /opt/ansible
+        fi
+        
     )
     if "%INSTALL_AWS_CLI%" == "yes" (
         echo.
@@ -426,7 +423,7 @@ $Init_sh_template = @"
         echo     fi
         echo fi
     )
-    if "%INSTALL_TESTSSL_SH%" == "yes" (
+   if "%INSTALL_TESTSSL_SH%" == "yes" (
         echo.
         echo #
         echo # Installing testssl.sh if not yet installed
@@ -446,13 +443,18 @@ $Init_sh_template = @"
         echo         wget -qO- --show-progress https://github.com/drwetter/testssl.sh/tarball/%TESTSSL_GIT_BRANCH% ^| tar -xzv --strip-components 1
         echo     fi
         echo     chmod +x /opt/testssl/testssl.sh
-        echo fi
-    )
+   fi
+)
 "@;
-$Init_sh_template | Out-File -FilePath $Init_sh -Encoding utf8;
+#$Init_sh_template | Out-File -FilePath $Init_sh -Encoding utf8;
+$Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($False)
+[System.IO.File]::WriteAllLines($Init_sh, $Init_sh_template, $Utf8NoBomEncoding)
 
+ 
+Write-Host -Object "launching Bash once to initialize user home dir [$Start_cmd]...";
+Start-Process -FilePath "$CYGWIN_ROOT\bin\dos2unix" -ArgumentList "$Init_sh" -Wait -PassThru; 
 
-#"%CYGWIN_ROOT%\bin\dos2unix" "%Init_sh%" || goto :fail
+#"%CYGWIN_ROOT%\bin\dos2unix" "$Init_sh" || goto :fail
 
 #endregion
 
@@ -481,16 +483,16 @@ set CYGWIN_DRIVE=%~d0
 echo disque cygwin %CYGWIN_DRIVE%
 set CYGWIN_ROOT=%~dp0cygwin
 echo dossier cygwin %CYGWIN_ROOT%
-echo.
+
 for %%i in (adb.exe) do (
-   set "ADB_PATH=~dp$PATH:i"
+   set "ADB_PATH=~dp`$PATH:i"
 )
-    echo.
+
 set PATH=%CYGWIN_PATH%;%CYGWIN_ROOT%\bin;%ADB_PATH%
 set ALLUSERSPROFILE=%CYGWIN_ROOT%\.ProgramData
 set ProgramData=%ALLUSERSPROFILE%
 set CYGWIN=nodosfilewarning
-    echo.
+
 set USERNAME=%CYGWIN_USERNAME%
 set HOME=/home/%USERNAME%
 set SHELL=/bin/bash
@@ -498,7 +500,7 @@ set HOMEDRIVE=%CYGWIN_DRIVE%
 set HOMEPATH=%CYGWIN_ROOT%\home\%USERNAME%
 set GROUP=None
 set GRP=
-    echo.
+
 echo Replacing [/etc/fstab]...
 (
     echo # /etc/fstab
@@ -507,33 +509,33 @@ echo Replacing [/etc/fstab]...
     echo #    This file is read once by the first process in a Cygwin process tree.
     echo #    To pick up changes, restart all Cygwin processes.  For a description
     echo #    see https://cygwin.com/cygwin-ug-net/using.html#mount-table
-    echo.
+  
     echo # noacl = disable Cygwin's - apparently broken - special ACL treatment which prevents apt-cyg and other programs from working
     echo none /cygdrive cygdrive binary,noacl,posix=0,user 0 0
-) > "%%CYGWIN_ROOT%%\etc\fstab"
-    echo.
+) > "%CYGWIN_ROOT%\etc\fstab"
+
 %CYGWIN_DRIVE%
 chdir "%CYGWIN_ROOT%\bin"
 bash "%CYGWIN_ROOT%\portable-init.sh"
-    echo.
-:: if "%1" == "" (
-::     if "%INSTALL_CONEMU%" == "yes" (
-::         if "%CYGWIN_ARCH%" == "64" (
-::           start "" "%~dp0conemu\ConEmu64.exe" %CON_EMU_OPTIONS%
-::         ) else (
-::           start "" "%~dp0conemu\ConEmu.exe" %CON_EMU_OPTIONS%
-::         )
-::     ) else (
-::       mintty --nopin %MINTTY_OPTIONS% --icon %CYGWIN_ROOT%\Cygwin-Terminal.ico -
-::     )
-:: ) else (
-  if "%1" == "no-mintty" (
-    bash --login -i
-  ) else (
-    bash --login -c %*
-  )
-:: )
-    echo.
+
+ if "%1" == "" (
+     if "%INSTALL_CONEMU%" == "yes" (
+         if "%CYGWIN_ARCH%" == "64" (
+           start "" "%~dp0conemu\ConEmu64.exe" %CON_EMU_OPTIONS%
+         ) else (
+           start "" "%~dp0conemu\ConEmu.exe" %CON_EMU_OPTIONS%
+         )
+     ) else (
+       mintty --nopin %MINTTY_OPTIONS% --icon %CYGWIN_ROOT%\Cygwin-Terminal.ico -
+     )
+ ) else (
+   if "%1" == "no-mintty" (
+      bash --login -i
+      ) else (
+      bash --login -c %*
+      )
+   )
+   
 cd "%CWD%"
 "@;
 #$Start_cmd_template | Out-File -FilePath $Start_cmd -Encoding utf8;
@@ -542,7 +544,5 @@ $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($False)
 
 # launching Bash once to initialize user home dir
 Write-Host -Object "launching Bash once to initialize user home dir [$Start_cmd]...";
-$return=(Start-Process -Wait -FilePath "$Start_cmd" -ArgumentList "whoami");
-
-Write-Host -Object $return;
+Start-Process -FilePath "$Start_cmd" -ArgumentList "whoami" -Wait -PassThru; 
 #endregion
