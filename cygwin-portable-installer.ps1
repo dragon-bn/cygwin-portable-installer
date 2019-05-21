@@ -28,8 +28,8 @@ write-host -object "Config Customization Start";
 # You can customize the following variables to your needs before running the batch file:
 
 # set proxy if required (unfortunately Cygwin setup.exe does not have commandline options to specify proxy user credentials)
-$PROXY_HOST=
-$PROXY_PORT=8080
+#$PROXY_HOST=
+#$PROXY_PORT=8080
 
 # change the URL to the closest mirror https://cygwin.com/mirrors.html
 #$CYGWIN_MIRROR="http://linux.rz.ruhr-uni-bochum.de/download/cygwin";
@@ -43,7 +43,7 @@ $CYGWIN_USERNAME="root";
 
 # select the packages to be installed automatically via apt-cyg
 #set CYGWIN_PACKAGES=bash-completion,bc,curl,expect,git,git-svn,gnupg,inetutils,lz4,mc,nc,openssh,openssl,perl,python,pv,ssh-pageant,screen,subversion,unzip,vim,wget,zip,zstd
-$CYGWIN_PACKAGES="bash-completion,bc,curl,expect,git,git-svn,gnupg,inetutils,lz4,mc,nc,openssh,openssl,perl,python,pv,ssh-pageant,screen,subversion,unzip,vim,wget,zip,zstd";
+$CYGWIN_PACKAGES="bash-completion,bc,curl,dos2unix,expect,git,git-svn,gnupg,inetutils,lz4,mc,nc,openssh,openssl,perl,python,pv,ssh-pageant,screen,subversion,unzip,vim,wget,zip,zstd";
 
 # if $to 'yes' the local package cache created by cygwin setup will be deleted after installation/update
 $DELETE_CYGWIN_PACKAGE_CACHE="no";
@@ -119,10 +119,10 @@ Write-Host -Object "Programme d'installation CYGMIN : $CYGWIN_SETUP";
 
 $DownloadFileSetup=Join-Path $INSTALL_ROOT -ChildPath $CYGWIN_SETUP;
 Write-Host -Object "Chemin de l'installateur CYGWIN : $DownloadFileSetup";
-if (!(Test-Path -Path $DownloadFileSetup -PathType Leaf))
+if (Test-Path -Path $DownloadFileSetup -PathType Leaf)
    {
       Write-Host -Object "Suppression de l'installateur CYGWIN : $DownloadFileSetup";
-      Remove-Item -Parent $DownloadFileSetup;
+      Remove-Item -Path $DownloadFileSetup;
    }
 
 # https://blog.jourdant.me/post/3-ways-to-download-files-with-powershell
@@ -233,7 +233,13 @@ if (!(Test-Path -Path $CYGWIN_CACHE -PathType Container))
 
 Write-Host -Object "Installation de CYGWIN en cours...";
 
-Start-Process -Wait -FilePath "$DownloadFileSetup" -ArgumentList "--site $CYGWIN_MIRROR --root $CYGWIN_ROOT --local-package-dir $CYGWIN_CACHE --quiet-mode --packages $CYGWIN_PACKAGES --verbose";
+Start-Process -RedirectStandardOutput output_installation.txt -RedirectStandardError err_installation.txt.txt -Wait -FilePath "$DownloadFileSetup" -ArgumentList "--site $CYGWIN_MIRROR --root $CYGWIN_ROOT --local-package-dir $CYGWIN_CACHE --quiet-mode --packages $CYGWIN_PACKAGES --verbose";
+$LastExitCode;
+#Write-Host -Object "Sortie de l'installation";
+#Get-Content -Path output_installation.txt;
+#Write-Host -Object "Erreur de l'installation";
+#Get-Content -Path err_installation.txt
+
 
 if ($DELETE_CYGWIN_PACKAGE_CACHE -ieq "yes")
 {
@@ -323,146 +329,36 @@ if ! grep -F "`$USER_SID" /etc/passwd > /dev/null; then
 fi
 
 # already set in cygwin-portable.cmd:
-# export CYGWIN_ROOT=`$(cygpath -w /^)
+export CYGWIN_ROOT=`$(cygpath -w /)
 
 # adjust Cygwin packages cache path
 #
-pkg_cache_dir=`$(cygpath -w "`$CYGWIN_ROOT/.pkg-cache"^)
-sed -i -E "s/.*\\\.pkg-cache/"`$'\t'"`${pkg_cache_dir//\\/\\\\}/" /etc/setup/setup.rc
-
-if not "`$PROXY_HOST" == "" (
-   if [[ `$HOSTNAME == "%COMPUTERNAME%" ]]; then
-      export http_proxy=http://`$PROXY_HOST:`$PROXY_PORT
-      export https_proxy=`$http_proxy
-   fi
-   )
-if "%INSTALL_CONEMU%" == "yes" (
-   #
-   # Installing conemu if required
-   #
-   conemu_dir=`$(cygpath -w "`$CYGWIN_ROOT/../conemu"^)
-   if [[ ! -e `$conemu_dir ]]; then
-      echo "*******************************************************************************"
-      echo "* Installing ConEmu..."
-      echo "*******************************************************************************"
-      conemu_url="https://github.com`$(wget https://github.com/Maximus5/ConEmu/releases/latest -O - 2>/dev/null | egrep '/.*/releases/download/.*/.*7z' -o)" ^&^& \
-      echo "Download URL=`$conemu_url" ^& \
-      wget -O "`${conemu_dir}.7z" `$conemu_url ^&^& \
-      mkdir "`$conemu_dir" ^&^& \
-      bsdtar -xvf "`${conemu_dir}.7z" -C "`$conemu_dir" ^&^& \
-      rm "`${conemu_dir}.7z"
-   fi
-   )
-    if "%INSTALL_ANSIBLE%" == "yes" (
-        
-        #
-        # Installing Ansible if not yet installed
-        #
-        if [[ ! -e /opt ]]; then mkdir /opt; fi
-        export PYTHONHOME=/usr/ PYTHONPATH=/usr/lib/python2.7 # workaround for "ImportError: No module named site" when Python for Windows is installed too
-        export PATH=`$PATH:/opt/ansible/bin
-        export PYTHONPATH=`$PYTHONPATH:/opt/ansible/lib
-        if ! hash ansible 2^>/dev/null; then
-         echo "*******************************************************************************"
-         echo "* Installing [Ansible - %ANSIBLE_GIT_BRANCH%]..."
-         echo "*******************************************************************************"
-         git clone https://github.com/ansible/ansible --branch %ANSIBLE_GIT_BRANCH% --single-branch --depth 1 --shallow-submodules /opt/ansible
-        fi
-        
-    )
-    if "%INSTALL_AWS_CLI%" == "yes" (
-        echo.
-        echo #
-        echo # Installing AWS CLI if not yet installed
-        echo #
-        echo if ! hash aws 2^>/dev/null; then
-        echo     echo "*******************************************************************************"
-        echo     echo "* Installing [AWS CLI]..."
-        echo     echo "*******************************************************************************"
-        echo     python -m ensurepip --default-pip
-        echo     # remove potential left-overs of previous installation
-        echo     rm -rf awscli-bundle.zip awscli-bundle /usr/bin/aws.cmd /usr/bin/aws /usr/local/aws /usr/local/bin/aws
-        echo     curl https://s3.amazonaws.com/aws-cli/awscli-bundle.zip -o awscli-bundle.zip
-        echo     unzip awscli-bundle.zip
-        echo     awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws
-        echo     rm -rf awscli-bundle awscli-bundle.zip
-        echo fi
-        echo.
-    )
-    if "%INSTALL_APT_CYG%" == "yes" (
-        echo #
-        echo # Installing apt-cyg package manager if not yet installed
-        echo #
-        echo if [[ ! -x /usr/local/bin/apt-cyg ]]; then
-        echo     echo "*******************************************************************************"
-        echo     echo "* Installing apt-cyg..."
-        echo     echo "*******************************************************************************"
-        echo     wget -O /usr/local/bin/apt-cyg https://raw.githubusercontent.com/kou1okada/apt-cyg/master/apt-cyg
-        echo     chmod +x /usr/local/bin/apt-cyg
-        echo fi
-        echo.
-    )
-    if "%INSTALL_BASH_FUNK%" == "yes" (
-        echo.
-        echo #
-        echo # Installing bash-funk if not yet installed
-        echo #
-        echo if [[ ! -e /opt ]]; then mkdir /opt; fi
-        echo if [[ ! -e /opt/bash-funk/bash-funk.sh ]]; then
-        echo     echo "*******************************************************************************"
-        echo     echo "* Installing [bash-funk]..."
-        echo     echo "*******************************************************************************"
-        echo     if hash git ^&^>/dev/null; then
-        echo         git clone https://github.com/vegardit/bash-funk --branch master --single-branch --depth 1 --shallow-submodules /opt/bash-funk
-        echo     elif hash svn ^&^>/dev/null; then
-        echo         svn checkout https://github.com/vegardit/bash-funk/trunk /opt/bash-funk
-        echo     else
-        echo         mkdir /opt/bash-funk ^&^& \
-        echo         cd /opt/bash-funk ^&^& \
-        echo         wget -qO- --show-progress https://github.com/vegardit/bash-funk/tarball/master ^| tar -xzv --strip-components 1
-        echo     fi
-        echo fi
-    )
-   if "%INSTALL_TESTSSL_SH%" == "yes" (
-        echo.
-        echo #
-        echo # Installing testssl.sh if not yet installed
-        echo #
-        echo if [[ ! -e /opt ]]; then mkdir /opt; fi
-        echo if [[ ! -e /opt/testssl/testssl.sh ]]; then
-        echo     echo "*******************************************************************************"
-        echo     echo "* Installing [testssl.sh - %TESTSSL_GIT_BRANCH%]..."
-        echo     echo "*******************************************************************************"
-        echo     if hash git ^&^>/dev/null; then
-        echo         git clone https://github.com/drwetter/testssl.sh --branch %TESTSSL_GIT_BRANCH% --single-branch --depth 1 --shallow-submodules /opt/testssl
-        echo     elif hash svn ^&^>/dev/null; then
-        echo         svn checkout https://github.com/drwetter/testssl.sh/branches/%TESTSSL_GIT_BRANCH% /opt/testssl
-        echo     else
-        echo         mkdir /opt/testssl ^&^& \
-        echo         cd /opt/testssl ^&^& \
-        echo         wget -qO- --show-progress https://github.com/drwetter/testssl.sh/tarball/%TESTSSL_GIT_BRANCH% ^| tar -xzv --strip-components 1
-        echo     fi
-        echo     chmod +x /opt/testssl/testssl.sh
-   fi
-)
+export pkg_cache_dir="`$(cygpath -w "`$CYGWIN_ROOT/.pkg-cache")
+# sed --in-place=".origin" '/This line is removed by the admin./c\\/cygdrive\/d\/Applis\/GIT\/cygwin\/cygwin-portable-installer\/Cygwin\/.pkg-cache\/' /etc/setup/setup.rc
+sed -i -E "s/.*\\\.pkg-cache/"`$'\t'"`${pkg_cache_dir}//\\/\\\\}/" /etc/setup/setup.rc
 "@;
 #$Init_sh_template | Out-File -FilePath $Init_sh -Encoding utf8;
 $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($False)
 [System.IO.File]::WriteAllLines($Init_sh, $Init_sh_template, $Utf8NoBomEncoding)
 
  
-Write-Host -Object "launching Bash once to initialize user home dir [$Start_cmd]...";
-Start-Process -FilePath "$CYGWIN_ROOT\bin\dos2unix" -ArgumentList "$Init_sh" -Wait -PassThru; 
-
+Write-Host -Object "launching Bash once to initialize user home dir [$Init_sh]...";
 #"%CYGWIN_ROOT%\bin\dos2unix" "$Init_sh" || goto :fail
+Set-Location -Path $CYGWIN_ROOT;
+Write-Host -Object "cygwin - init"
+$FileName_Init_sh=[System.IO.Path]::GetFileName("$Init_sh");
+Write-Host -Object "Fichiet INit $FileName_Init_sh dans le dossier $(get-location)";
+Start-Process -FilePath "$CYGWIN_ROOT\bin\dos2unix" -ArgumentList "$FileName_Init_sh" -Wait -PassThru -RedirectStandardOutput output_init.txt -RedirectStandardError err_init.txt;
+$LastExitCode;
+Get-Content -Path output_init.txt;
+Get-Content -Path err_init.txt;
 
+Set-Location -Path $INSTALL_ROOT;
 #endregion
 
 #region Creatinglauncher
 $Start_cmd=Join-Path -Path $INSTALL_ROOT -ChildPath cygwin-portable.cmd;
 Write-Host -Object "Creating launcher [$Start_cmd]...";
-
-Write-Host -Object "Creating [$Start_cmd]...";
 
 $Start_cmd_template = @"
 `@echo off
@@ -544,5 +440,9 @@ $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding($False)
 
 # launching Bash once to initialize user home dir
 Write-Host -Object "launching Bash once to initialize user home dir [$Start_cmd]...";
-Start-Process -FilePath "$Start_cmd" -ArgumentList "whoami" -Wait -PassThru; 
+Start-Process -FilePath "$Start_cmd" -ArgumentList "whoami" -Wait -PassThru -RedirectStandardOutput output_first_launch.txt -RedirectStandardError err_first_launch.txt;
+$LastExitCode;
+Get-Content -Path output_first_launch.txt;
+Get-Content -Path err_first_launch.txt; 
+
 #endregion

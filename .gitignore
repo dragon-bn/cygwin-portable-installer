@@ -5,6 +5,8 @@ conemu/
 cygwin/
 cygwin-portable.cmd
 cygwin-portable-updater.cmd
-cygwin-portable-updater.code-workspace
+cygwin-portable-installer.code-workspace
 test.ps1
 setup-x86_64.exe
+err*.txt
+output*.txt
