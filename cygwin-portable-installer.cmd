@@ -105,7 +105,7 @@ set INSTALL_ROOT=%~dp0
 set CYGWIN_ROOT=%INSTALL_ROOT%cygwin
 echo Creating Cygwin root [%CYGWIN_ROOT%]...
 if not exist "%CYGWIN_ROOT%" (
-    md "%CYGWIN_ROOT%"
+    mkdir "%CYGWIN_ROOT%"
 )
 
 :: create VB script that can download files
@@ -123,7 +123,7 @@ if "%PROXY_HOST%" == "" (
     echo target = Wscript.Arguments(1^)
     echo WScript.Echo "Downloading '" ^& url ^& "' to '" ^& target ^& "'..."
     echo Set req = CreateObject("WinHttp.WinHttpRequest.5.1"^)
-    echo%DOWNLOADER_PROXY%
+    :: echo %DOWNLOADER_PROXY%
     echo req.Open "GET", url, False
     echo req.Send
     echo If req.Status ^<^> 200 Then
@@ -140,6 +140,8 @@ if "%PROXY_HOST%" == "" (
     echo.
 ) >"%DOWNLOADER%" || goto :fail
 
+
+echo "Detection of processor architecture"
 :: https://blogs.msdn.microsoft.com/david.wang/2006/03/27/howto-detect-process-bitness/
 if "%CYGWIN_ARCH%" == "auto" (
     if "%PROCESSOR_ARCHITECTURE%" == "x86" (
@@ -152,19 +154,23 @@ if "%CYGWIN_ARCH%" == "auto" (
         set CYGWIN_ARCH=64
     )
 )
+echo Architecture is %CYGWIN_ARCH%
 
+echo Definition of setup to download
 :: download Cygwin 32 or 64 setup exe depending on detected architecture
 if "%CYGWIN_ARCH%" == "64" (
     set CYGWIN_SETUP=setup-x86_64.exe
 ) else (
     set CYGWIN_SETUP=setup-x86.exe
 )
-
+echo file to download %CYGWIN_SETUP%
+echo Remove file setup if exist
 if exist "%CYGWIN_ROOT%\%CYGWIN_SETUP%" (
+    echo "%CYGWIN_ROOT%\%CYGWIN_SETUP%"
     del "%CYGWIN_ROOT%\%CYGWIN_SETUP%" || goto :fail
 )
 cscript //Nologo "%DOWNLOADER%" https://cygwin.org/%CYGWIN_SETUP% "%CYGWIN_ROOT%\%CYGWIN_SETUP%" || goto :fail
-del "%DOWNLOADER%"
+:: del "%DOWNLOADER%"
 
 :: Cygwin command line options: https://cygwin.com/faq/faq.html#faq.setup.cli
 if "%PROXY_HOST%" == "" (
@@ -253,7 +259,7 @@ set Cygwin_bat=%CYGWIN_ROOT%\Cygwin.bat
 if exist "%CYGWIN_ROOT%\Cygwin.bat" (
     echo Disabling default Cygwin launcher [%Cygwin_bat%]...
     if exist "%Cygwin_bat%.disabled" (
-        del "%Cygwin_bat%.disabled" || goto :fail
+        :: del "%Cygwin_bat%.disabled" || goto :fail
     )
     rename "%Cygwin_bat%" Cygwin.bat.disabled || goto :fail
 )
@@ -610,7 +616,7 @@ goto :eof
 
 :fail
     if exist "%DOWNLOADER%" (
-        del "%DOWNLOADER%"
+        :: del "%DOWNLOADER%"
     )
     echo.
     echo ###########################################################
